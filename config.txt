@@ -1,0 +1,11 @@
+core_freq=250
+dtparam=i2c_arm=on
+dtparam=spi=on
+dtparam=audio=on
+avoid_warnings=1
+disable_overscan=1
+disable_splash=1
+gpu_mem=16
+enable_uart=1
+dtparam=i2c_vc=on
+force_eeprom_read=0

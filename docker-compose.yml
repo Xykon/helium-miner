@@ -1,0 +1,85 @@
+version: '2'
+
+services:
+
+  gateway-config:
+    image: "docker.io/pycomio/hm-config:latest@sha256:f8d2b2a100945fde767fe5aa7e8f927a6b1fcf8853cfcbd2840529965f3e4ed5"
+    depends_on:
+      - dbus-session
+    environment:
+      - FIRMWARE_VERSION=2022.01.09.1
+      - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host/run/dbus/system_bus_socket
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/session/dbus/session_bus_socket
+    privileged: true
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - miner-storage:/var/data
+      - dbus:/session/dbus
+    labels:
+      io.balena.features.sysfs: 1
+      io.balena.features.kernel-modules: 1
+      io.balena.features.dbus: 1
+    stop_signal: SIGINT
+
+
+  packet-forwarder:
+    image: "docker.io/pycomio/hm-pktfwd:latest@sha256:3053497ae72e1218f7bb250aff22123bc82b3549ccf17039a28f97a0385665c4"
+    depends_on:
+      - helium-miner
+    privileged: true
+    volumes:
+      - pktfwdr:/var/pktfwd
+
+  helium-miner:
+    image: "docker.io/pycomio/hm-miner:latest@sha256:d2fb689fd4000ffecf113d688a3726bddc726e733fd5c13633340349b120fd64"
+    depends_on:
+      - dbus-session
+    expose:
+      - "1680"
+      - "4467"
+    ports:
+      - "44158:44158/tcp"
+    volumes:
+      - miner-storage:/var/data
+      - miner-log:/var/log/miner
+      - pktfwdr:/var/pktfwd
+      - dbus:/session/dbus
+    cap_add:
+      - SYS_RAWIO
+    devices:
+      - /dev/i2c-10:/dev/i2c-1
+    restart: on-failure
+    environment:
+      - DBUS_SYSTEM_BUS_ADDRESS=unix:path=/session/dbus/session_bus_socket
+      - RELEASE_BUMPER=foobar
+
+  gwmfr:
+    image: "docker.io/pycomio/hm-gwmfr:latest@sha256:4c0bfdc53d65a3f6c2126f513596249c9d50ed9e6340c7c248ccededfe696697"
+    cap_add:
+      - SYS_RAWIO
+    devices:
+      - "/dev/i2c-10:/dev/i2c-1"
+    restart: on-failure
+
+  upnp:
+    image: "docker.io/pycomio/hm-upnp:latest@sha256:451dafe1aebb078cddb452f2a92a3acd7432e9b194beca32690fd73ca9080176"
+    network_mode: host
+    restart: on-failure
+    volumes:
+      - pktfwdr:/var/pktfwd
+
+  dbus-session:
+    image: balenablocks/dbus:rpi-0.0.2
+    restart: always
+    volumes:
+      - dbus:/session/dbus
+    environment:
+      - DBUS_ADDRESS=unix:path=/session/dbus/session_bus_socket
+
+volumes:
+  miner-storage:
+  miner-log:
+  pktfwdr:
+  dbus:
